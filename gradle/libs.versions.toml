@@ -1,19 +1,19 @@
 [versions]
 
-kotlin = "1.9.23"
+kotlin = "1.9.24"
 ksp = "1.9.23-1.0.20"
 agp = "8.3.2"
 appcompat = "1.6.1"
 colorpicker = "1.1.0"
 commonsText = "1.11.0"
 constraintlayout = "2.1.4"
-core = "1.12.0"
+core = "1.13.1"
 firebaseBom = "32.8.1"
 flexbox = "3.0.0"
 fragment = "1.6.2"
 
 #不要更新版本
-hutool = "5.8.22"
+hutool = "5.8.27"
 
 libarchive = "1.0.3"
 lifecycle = "2.7.0"
@@ -22,7 +22,7 @@ gson = "2.10.1"
 jsonPath = "2.9.0"
 # issue #3811，不要更新版本，新版引入了一个破坏性变更（详见https://github.com/jhy/jsoup/pull/2017）
 # 若要升级请确保相关代码不会受此变更影响（如AnalyzeByJSoup.kt、JsoupXpath库等）
-jsoup = "1.16.2"
+jsoup = "1.17.2"
 jsoupxpath = "2.5.3"
 coroutines = "1.8.0"
 liveeventbus = "1.8.14"
@@ -38,12 +38,12 @@ quickChineseTransfer = "0.2.13"
 room = "2.6.1"
 splitties = "3.0.0"
 
-activity = "1.8.2"
+activity = "1.9.0"
 kotlinxSerialization = "1.6.3"
 swiperefreshlayout = "1.1.0"
 viewpager2 = "1.0.0"
 webkit = "1.10.0"
-zxingLite = "3.0.1"
+zxingLite = "3.1.1"
 
 
 [libraries]
@@ -111,7 +111,7 @@ room-testing = { module = "androidx.room:room-testing", version.ref = "room" }
 
 glide-glide = { module = "com.github.bumptech.glide:glide", version.ref = "glide" }
 glide-compiler = { module = "com.github.bumptech.glide:compiler", version.ref = "glide" }
-glide-compose = { module = "com.github.bumptech.glide:compose", version = "1.0.0-beta01" }
+glide-compose = { module = "com.github.bumptech.glide:compose", version = "4.14.0" }
 glide-ksp = { module = "com.github.bumptech.glide:ksp", version.ref = "glide" }
 glide-avif = { module = "com.github.bumptech.glide:avif-integration", version.ref = "glide" }
 avif = { module = "org.aomedia.avif.android:avif", version = "1.0.1.262e11d" }
