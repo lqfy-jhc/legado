@@ -22,9 +22,11 @@ import io.legado.app.help.book.BookHelp
 import io.legado.app.help.book.getExportFileName
 import io.legado.app.help.book.getRemoteUrl
 import io.legado.app.help.book.isLocal
+import io.legado.app.help.book.isNotShelf
 import io.legado.app.help.book.isSameNameAuthor
 import io.legado.app.help.book.isWebFile
 import io.legado.app.help.book.removeType
+import io.legado.app.help.book.simulatedTotalChapterNum
 import io.legado.app.help.coroutine.Coroutine
 import io.legado.app.lib.webdav.ObjectNotFoundException
 import io.legado.app.model.BookCover
@@ -56,7 +58,7 @@ class BookInfoViewModel(application: Application) : BaseViewModel(application) {
             val author = intent.getStringExtra("author") ?: ""
             val bookUrl = intent.getStringExtra("bookUrl") ?: ""
             appDb.bookDao.getBook(name, author)?.let {
-                inBookshelf = true
+                inBookshelf = !it.isNotShelf
                 upBook(it)
                 return@execute
             }
@@ -123,7 +125,7 @@ class BookInfoViewModel(application: Application) : BaseViewModel(application) {
     }
 
     fun refreshBook(book: Book) {
-        execute(executeContext = IO) {
+        executeLazy(executeContext = IO) {
             if (book.isLocal) {
                 book.tocUrl = ""
                 book.getRemoteUrl()?.let {
@@ -139,7 +141,7 @@ class BookInfoViewModel(application: Application) : BaseViewModel(application) {
                     }
                 }
             } else {
-                val bs = bookSource ?: return@execute
+                val bs = bookSource ?: return@executeLazy
                 if (book.originName != bs.bookSourceName) {
                     book.originName = bs.bookSourceName
                 }
@@ -156,7 +158,7 @@ class BookInfoViewModel(application: Application) : BaseViewModel(application) {
             }
         }.onFinally {
             loadBookInfo(book, false)
-        }
+        }.start()
     }
 
     fun loadBookInfo(
@@ -165,6 +167,8 @@ class BookInfoViewModel(application: Application) : BaseViewModel(application) {
         scope: CoroutineScope = viewModelScope
     ) {
         if (book.isLocal) {
+            LocalBook.upBookInfo(book)
+            bookData.postValue(book)
             loadChapter(book, scope)
         } else {
             val bookSource = bookSource ?: let {
@@ -175,7 +179,7 @@ class BookInfoViewModel(application: Application) : BaseViewModel(application) {
             WebBook.getBookInfo(scope, bookSource, book, canReName = canReName)
                 .onSuccess(IO) {
                     val dbBook = appDb.bookDao.getBook(book.name, book.author)
-                    if (dbBook != null && dbBook.origin == book.origin) {
+                    if (dbBook != null && !dbBook.isNotShelf && dbBook.origin == book.origin) {
                         /**
                          * book 来自搜索时，搜索的书名不存在于书架，但是加载详情后，书名更新，存在同名书籍
                          * 此时 book 的数据会与数据库中的不同，需要更新 #3652
@@ -250,6 +254,7 @@ class BookInfoViewModel(application: Application) : BaseViewModel(application) {
                         if (book.isSameNameAuthor(ReadBook.book)) {
                             ReadBook.book = book
                             ReadBook.chapterSize = book.totalChapterNum
+                            ReadBook.simulatedChapterSize = book.simulatedTotalChapterNum()
                         }
                     }
                     bookData.postValue(book)
@@ -424,6 +429,7 @@ class BookInfoViewModel(application: Application) : BaseViewModel(application) {
     fun addToBookshelf(success: (() -> Unit)?) {
         execute {
             bookData.value?.let { book ->
+                book.removeType(BookType.notShelf)
                 if (book.order == 0) {
                     book.order = appDb.bookDao.minOrder - 1
                 }

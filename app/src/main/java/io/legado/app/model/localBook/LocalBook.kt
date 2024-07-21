@@ -97,6 +97,10 @@ object LocalBook {
                 PdfFile.getChapterList(book)
             }
 
+            book.isMobi -> {
+                MobiFile.getChapterList(book)
+            }
+
             else -> {
                 TextFile.getChapterList(book)
             }
@@ -125,6 +129,10 @@ object LocalBook {
 
                 book.isPdf -> {
                     PdfFile.getContent(book, chapter)
+                }
+
+                book.isMobi -> {
+                    MobiFile.getContent(book, chapter)
                 }
 
                 else -> {
@@ -192,15 +200,24 @@ object LocalBook {
                 latestChapterTime = updateTime,
                 order = appDb.bookDao.minOrder - 1
             )
-            if (book.isEpub) EpubFile.upBookInfo(book)
-            if (book.isUmd) UmdFile.upBookInfo(book)
-            if (book.isPdf) PdfFile.upBookInfo(book)
+            upBookInfo(book)
             appDb.bookDao.insert(book)
         } else {
+            deleteBook(book, false)
+            upBookInfo(book)
             //已有书籍说明是更新,删除原有目录
             appDb.bookChapterDao.delByBook(bookUrl)
         }
         return book
+    }
+
+    fun upBookInfo(book: Book) {
+        when {
+            book.isEpub -> EpubFile.upBookInfo(book)
+            book.isUmd -> UmdFile.upBookInfo(book)
+            book.isPdf -> PdfFile.upBookInfo(book)
+            book.isMobi -> MobiFile.upBookInfo(book)
+        }
     }
 
     /* 导入压缩包内的书籍 */
@@ -306,6 +323,9 @@ object LocalBook {
     fun deleteBook(book: Book, deleteOriginal: Boolean) {
         kotlin.runCatching {
             BookHelp.clearCache(book)
+            if (!book.coverUrl.isNullOrEmpty()) {
+                FileUtils.delete(book.coverUrl!!)
+            }
             if (deleteOriginal) {
                 if (book.bookUrl.isContentScheme()) {
                     val uri = Uri.parse(book.bookUrl)

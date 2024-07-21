@@ -45,6 +45,7 @@ import io.legado.app.help.book.isAudio
 import io.legado.app.help.book.isEpub
 import io.legado.app.help.book.isLocal
 import io.legado.app.help.book.isLocalTxt
+import io.legado.app.help.book.isMobi
 import io.legado.app.help.book.removeType
 import io.legado.app.help.config.AppConfig
 import io.legado.app.help.config.ReadBookConfig
@@ -59,6 +60,7 @@ import io.legado.app.model.ReadAloud
 import io.legado.app.model.ReadBook
 import io.legado.app.model.analyzeRule.AnalyzeRule
 import io.legado.app.model.localBook.EpubFile
+import io.legado.app.model.localBook.MobiFile
 import io.legado.app.receiver.TimeBatteryReceiver
 import io.legado.app.service.BaseReadAloudService
 import io.legado.app.ui.about.AppLogDialog
@@ -66,6 +68,7 @@ import io.legado.app.ui.book.audio.AudioPlayActivity
 import io.legado.app.ui.book.bookmark.BookmarkDialog
 import io.legado.app.ui.book.changesource.ChangeBookSourceDialog
 import io.legado.app.ui.book.changesource.ChangeChapterSourceDialog
+import io.legado.app.ui.book.info.BookInfoActivity
 import io.legado.app.ui.book.read.config.AutoReadDialog
 import io.legado.app.ui.book.read.config.BgTextConfigDialog.Companion.BG_COLOR
 import io.legado.app.ui.book.read.config.BgTextConfigDialog.Companion.TEXT_COLOR
@@ -189,6 +192,13 @@ class ReadBookActivity : BaseReadBookActivity(),
                 }
             }
         }
+    private val bookInfoActivity =
+        registerForActivityResult(StartActivityContract(BookInfoActivity::class.java)) {
+            if (it.resultCode == RESULT_OK) {
+                setResult(RESULT_DELETED)
+                super.finish()
+            }
+        }
     private val selectImageDir = registerForActivityResult(HandleFileContract()) {
         it.uri?.let { uri ->
             ACache.get().put(AppConst.imagePathKey, uri.toString())
@@ -232,7 +242,6 @@ class ReadBookActivity : BaseReadBookActivity(),
             binding.readMenu.upSeekBar()
         }
     }
-    private var upContent = true
 
     //恢复跳转前进度对话框的交互结果
     private var confirmRestoreProcess: Boolean? = null
@@ -280,6 +289,14 @@ class ReadBookActivity : BaseReadBookActivity(),
             viewModel.initData(intent)
             false
         }
+    }
+
+    override fun onNewIntent(intent: Intent?) {
+        super.onNewIntent(intent)
+        if (!ReadBook.inBookshelf) {
+            viewModel.removeFromBookshelf(null)
+        }
+        viewModel.initData(intent ?: return)
     }
 
     override fun onWindowFocusChanged(hasFocus: Boolean) {
@@ -458,11 +475,15 @@ class ReadBookActivity : BaseReadBookActivity(),
 
             R.id.menu_download -> showDownloadDialog()
             R.id.menu_add_bookmark -> addBookmark()
+            R.id.menu_simulated_reading -> showSimulatedReading()
             R.id.menu_edit_content -> showDialogFragment(ContentEditDialog())
             R.id.menu_update_toc -> ReadBook.book?.let {
                 if (it.isEpub) {
                     BookHelp.clearCache(it)
                     EpubFile.clear()
+                }
+                if (it.isMobi) {
+                    MobiFile.clear()
                 }
                 loadChapterList(it)
             }
@@ -948,6 +969,9 @@ class ReadBookActivity : BaseReadBookActivity(),
 
     override fun notifyBookChanged() {
         bookChanged = true
+        if (!ReadBook.inBookshelf) {
+            viewModel.removeFromBookshelf { super.finish() }
+        }
     }
 
     /**
@@ -1054,6 +1078,15 @@ class ReadBookActivity : BaseReadBookActivity(),
         ReadBook.bookSource?.let {
             sourceEditActivity.launch {
                 putExtra("sourceUrl", it.bookSourceUrl)
+            }
+        }
+    }
+
+    override fun openBookInfoActivity() {
+        ReadBook.book?.let {
+            bookInfoActivity.launch {
+                putExtra("name", it.name)
+                putExtra("author", it.author)
             }
         }
     }
@@ -1205,7 +1238,7 @@ class ReadBookActivity : BaseReadBookActivity(),
                         ReadBook.book?.let {
                             ReadBook.curTextChapter = null
                             BookHelp.delContent(book, chapter)
-                            viewModel.loadChapterList(book)
+                            loadChapterList(book)
                         }
                     }
                 }.onError {
@@ -1457,6 +1490,8 @@ class ReadBookActivity : BaseReadBookActivity(),
             alert(title = getString(R.string.add_to_bookshelf)) {
                 setMessage(getString(R.string.check_add_bookshelf, book.name))
                 okButton {
+                    ReadBook.book?.removeType(BookType.notShelf)
+                    ReadBook.book?.save()
                     ReadBook.inBookshelf = true
                     setResult(Activity.RESULT_OK)
                 }
@@ -1472,6 +1507,9 @@ class ReadBookActivity : BaseReadBookActivity(),
         popupAction.dismiss()
         binding.readView.onDestroy()
         ReadBook.unregister(this)
+        if (!ReadBook.inBookshelf && !isChangingConfigurations) {
+            viewModel.removeFromBookshelf(null)
+        }
         if (!BuildConfig.DEBUG) {
             Backup.autoBack(this)
         }
@@ -1573,4 +1611,9 @@ class ReadBookActivity : BaseReadBookActivity(),
             }
         }
     }
+
+    companion object {
+        const val RESULT_DELETED = 100
+    }
+
 }

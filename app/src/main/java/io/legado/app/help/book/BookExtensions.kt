@@ -23,8 +23,12 @@ import io.legado.app.utils.isUri
 import io.legado.app.utils.toastOnUi
 import splitties.init.appCtx
 import java.io.File
+import java.time.LocalDate
+import java.time.Period.between
 import java.util.concurrent.ConcurrentHashMap
 import kotlin.collections.set
+import kotlin.math.max
+import kotlin.math.min
 
 
 val Book.isAudio: Boolean
@@ -53,6 +57,11 @@ val Book.isUmd: Boolean
 val Book.isPdf: Boolean
     get() = isLocal && originName.endsWith(".pdf", true)
 
+val Book.isMobi: Boolean
+    get() = isLocal && (originName.endsWith(".mobi", true) ||
+            originName.endsWith(".azw3", true) ||
+            originName.endsWith(".azw", true))
+
 val Book.isOnLineTxt: Boolean
     get() = !isLocal && isType(BookType.text)
 
@@ -64,6 +73,9 @@ val Book.isUpError: Boolean
 
 val Book.isArchive: Boolean
     get() = isType(BookType.archive)
+
+val Book.isNotShelf: Boolean
+    get() = isType(BookType.notShelf)
 
 val Book.archiveName: String
     get() {
@@ -223,6 +235,10 @@ fun BookSource.getBookType(): Int {
     }
 }
 
+fun BookSource.getAllBookType(): Int {
+    return BookType.text or BookType.image or BookType.audio or BookType.webFile
+}
+
 fun Book.sync(oldBook: Book) {
     val curBook = appDb.bookDao.getBook(oldBook.bookUrl)!!
     durChapterTime = curBook.durChapterTime
@@ -238,6 +254,11 @@ fun Book.getBookSource(): BookSource? {
 
 fun Book.isLocalModified(): Boolean {
     return isLocal && LocalBook.getLastModified(this).getOrDefault(0L) > latestChapterTime
+}
+
+fun Book.releaseHtmlData() {
+    infoHtml = null
+    tocHtml = null
 }
 
 fun Book.isSameNameAuthor(other: Any?): Boolean {
@@ -285,6 +306,24 @@ fun Book.getExportFileName(
     }.onFailure {
         AppLog.put("导出书名规则错误,使用默认规则\n${it.localizedMessage}", it)
     }.getOrDefault(default)
+}
+
+// 根据当前日期计算章节总数
+fun Book.simulatedTotalChapterNum(): Int {
+    return if (readSimulating()) {
+        val currentDate = LocalDate.now()
+        val daysPassed = between(this.config.startDate, currentDate).days + 1
+        // 计算当前应该解锁到哪一章
+        val chaptersToUnlock =
+            max(0, (config.startChapter ?: 0) + (daysPassed * config.dailyChapters))
+        min(totalChapterNum, chaptersToUnlock)
+    } else {
+        totalChapterNum
+    }
+}
+
+fun Book.readSimulating(): Boolean {
+    return config.readSimulating
 }
 
 fun tryParesExportFileName(jsStr: String): Boolean {
