@@ -471,6 +471,8 @@ object AppConfig : SharedPreferences.OnSharedPreferenceChangeListener {
 
     val defaultHomePage get() = appCtx.getPrefString(PreferKey.defaultHomePage, "bookshelf")
 
+    val updateToVariant get() = appCtx.getPrefString(PreferKey.updateToVariant, "default_version")
+
     val doublePageHorizontal: String?
         get() = appCtx.getPrefString(PreferKey.doublePageHorizontal)
 
